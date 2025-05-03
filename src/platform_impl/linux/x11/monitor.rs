@@ -250,6 +250,7 @@ impl XConnection {
         let mut has_primary = false;
         let mut available_monitors = Vec::with_capacity(resources.crtcs().len());
         for (crtc_id, crtc) in resources.crtcs().iter().zip(crtc_infos.iter()) {
+            dbg!(&crtc);
             if crtc.width == 0 || crtc.height == 0 || crtc.outputs.is_empty() {
                 continue;
             }

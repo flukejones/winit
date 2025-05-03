@@ -5,9 +5,11 @@ use super::*;
 use crate::dpi::validate_scale_factor;
 use crate::platform_impl::platform::x11::{monitor, VideoModeHandle};
 
+use rustix::path::Arg;
 use tracing::warn;
 use x11rb::protocol::randr::{self, ConnectionExt as _};
 
+#[derive(Debug)]
 /// Represents values of `WINIT_HIDPI_FACTOR`.
 pub enum EnvVarDPI {
     Randr,
@@ -19,6 +21,7 @@ pub fn calc_dpi_factor(
     (width_px, height_px): (u32, u32),
     (width_mm, height_mm): (u64, u64),
 ) -> f64 {
+    dbg!((width_px, height_px), (width_mm, height_mm));
     // See http://xpra.org/trac/ticket/728 for more information.
     if width_mm == 0 || height_mm == 0 {
         warn!("XRandR reported that the display's 0mm in size, which is certifiably insane");
@@ -26,8 +29,10 @@ pub fn calc_dpi_factor(
     }
 
     let ppmm = ((width_px as f64 * height_px as f64) / (width_mm as f64 * height_mm as f64)).sqrt();
+    dbg!(ppmm);
     // Quantize 1/12 step size
     let dpi_factor = ((ppmm * (12.0 * 25.4 / 96.0)).round() / 12.0).max(1.0);
+    dbg!(dpi_factor);
     assert!(validate_scale_factor(dpi_factor));
     if dpi_factor <= 20. {
         dpi_factor
@@ -70,6 +75,7 @@ impl XConnection {
                 return None;
             },
         };
+        dbg!(output_info.name.to_string_lossy(), output_info.mm_width, output_info.mm_height);
 
         let bit_depth = self.default_root().root_depth;
         let output_modes = &output_info.modes;
@@ -126,6 +132,7 @@ impl XConnection {
                 }
             },
         );
+        dbg!(&dpi_env);
 
         let scale_factor = match dpi_env {
             EnvVarDPI::Randr => calc_dpi_factor(
@@ -152,6 +159,7 @@ impl XConnection {
                 }
             },
         };
+        dbg!(scale_factor);
 
         Some((name, scale_factor, modes))
     }
