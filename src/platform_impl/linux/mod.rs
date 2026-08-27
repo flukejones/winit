@@ -17,7 +17,7 @@ use smol_str::SmolStr;
 
 #[cfg(x11_platform)]
 use self::x11::{X11Error, XConnection, XError, XNotSupported};
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error::{EventLoopError, ExternalError, NotSupportedError, OsError as RootOsError};
 use crate::event_loop::{
     ActiveEventLoop as RootELW, AsyncRequestSerial, ControlFlow, DeviceEvents, EventLoopClosed,
@@ -360,6 +360,11 @@ impl Window {
     #[inline]
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         x11_or_wayland!(match self; Window(w) => w.inner_size())
+    }
+
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     #[inline]

@@ -13,7 +13,7 @@ use android_activity::{
 use tracing::{debug, trace, warn};
 
 use crate::cursor::Cursor;
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error;
 use crate::error::EventLoopError;
 use crate::event::{self, Force, InnerSizeWriter, StartCause};
@@ -839,6 +839,10 @@ impl Window {
 
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         self.outer_size()
+    }
+
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     pub fn request_inner_size(&self, _size: Size) -> Option<PhysicalSize<u32>> {

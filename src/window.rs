@@ -1,7 +1,7 @@
 //! The [`Window`] struct and associated types.
 use std::fmt;
 
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error::{ExternalError, NotSupportedError};
 use crate::monitor::{MonitorHandle, VideoModeHandle};
 use crate::platform_impl::{self, PlatformSpecificWindowAttributes};
@@ -748,17 +748,32 @@ impl Window {
     ///
     /// ## Platform-specific
     ///
-    /// - **iOS:** Can only be called on the main thread. Returns the `PhysicalSize` of the window's
-    ///   [safe area] in screen space coordinates.
+    /// - **iOS:** Can only be called on the main thread. Returns the full window frame; use
+    ///   [`Window::safe_area`] for the unobstructed part of it.
     /// - **Web:** Returns the size of the canvas element. Doesn't account for CSS [`transform`].
     ///
-    /// [safe area]: https://developer.apple.com/documentation/uikit/uiview/2891103-safeareainsets?language=objc
     /// [`transform`]: https://developer.mozilla.org/en-US/docs/Web/CSS/transform
     #[inline]
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         let _span = tracing::debug_span!("winit::Window::inner_size",).entered();
 
         self.window.maybe_wait_on_main(|w| w.inner_size())
+    }
+
+    /// Insets of the area obstructed by notches, bezels and system UI, relative to
+    /// [`Window::inner_size`].
+    ///
+    /// If the entire surface is visible, this returns `(0, 0, 0, 0)`.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **Android / macOS / Orbital / Wayland / Web / Windows / X11:** Unimplemented, returns `(0,
+    ///   0, 0, 0)`.
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        let _span = tracing::debug_span!("winit::Window::safe_area",).entered();
+
+        self.window.maybe_wait_on_main(|w| w.safe_area())
     }
 
     /// Request the new size for the window.

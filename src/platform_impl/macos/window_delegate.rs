@@ -33,7 +33,9 @@ use super::observer::RunLoop;
 use super::view::WinitView;
 use super::window::WinitWindow;
 use super::{ffi, Fullscreen, MonitorHandle, OsError, WindowId};
-use crate::dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{
+    LogicalPosition, LogicalSize, PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size,
+};
 use crate::error::{ExternalError, NotSupportedError, OsError as RootOsError};
 use crate::event::{InnerSizeWriter, WindowEvent};
 use crate::platform::macos::{OptionAsAlt, WindowExtMacOS};
@@ -945,6 +947,11 @@ impl WindowDelegate {
         let content_rect = self.window().contentRectForFrameRect(self.window().frame());
         let logical = LogicalSize::new(content_rect.size.width, content_rect.size.height);
         logical.to_physical(self.scale_factor())
+    }
+
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     #[inline]

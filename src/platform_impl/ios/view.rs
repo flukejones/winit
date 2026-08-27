@@ -31,6 +31,9 @@ pub struct WinitViewState {
     rotation_last_delta: Cell<CGFloat>,
     pinch_last_delta: Cell<CGFloat>,
     pan_last_delta: Cell<CGPoint>,
+
+    // Armed while iOS 26's keyboard presents; it injects a phantom "\n".
+    phantom_return_pending: Cell<bool>,
 }
 
 declare_class!(
@@ -368,6 +371,7 @@ impl WinitView {
             rotation_last_delta: Cell::new(0.0),
             pinch_last_delta: Cell::new(0.0),
             pan_last_delta: Cell::new(CGPoint { x: 0.0, y: 0.0 }),
+            phantom_return_pending: Cell::new(false),
         });
         let this: Retained<Self> = unsafe { msg_send_id![super(this), initWithFrame: frame] };
 
@@ -378,6 +382,11 @@ impl WinitView {
         }
 
         this
+    }
+
+    /// Swallow newlines until other text: iOS 26 injects a phantom Return.
+    pub(crate) fn arm_phantom_return_guard(&self) {
+        self.ivars().phantom_return_pending.set(true);
     }
 
     fn window(&self) -> Option<Retained<WinitUIWindow>> {
@@ -541,13 +550,20 @@ impl WinitView {
     }
 
     fn handle_insert_text(&self, text: &NSString) {
+        let text = text.to_string();
+        if self.ivars().phantom_return_pending.get() {
+            if text == "\n" {
+                return;
+            }
+            self.ivars().phantom_return_pending.set(false);
+        }
         let window = self.window().unwrap();
         let window_id = RootWindowId(window.id());
         let mtm = MainThreadMarker::new().unwrap();
         // send individual events for each character
         app_state::handle_nonuser_events(
             mtm,
-            text.to_string().chars().flat_map(|c| {
+            text.chars().flat_map(|c| {
                 let text = smol_str::SmolStr::from_iter([c]);
                 // Emit both press and release events
                 [ElementState::Pressed, ElementState::Released].map(|state| {

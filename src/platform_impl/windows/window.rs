@@ -47,7 +47,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use tracing::warn;
 
 use crate::cursor::Cursor;
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error::{ExternalError, NotSupportedError, OsError as RootOsError};
 use crate::icon::Icon;
 use crate::platform::windows::{BackdropType, Color, CornerPreference};
@@ -220,6 +220,11 @@ impl Window {
             )
         }
         PhysicalSize::new((rect.right - rect.left) as u32, (rect.bottom - rect.top) as u32)
+    }
+
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     #[inline]

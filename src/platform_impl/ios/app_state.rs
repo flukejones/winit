@@ -22,6 +22,7 @@ use objc2_foundation::{
 };
 use objc2_ui_kit::{UIApplication, UICoordinateSpace, UIView, UIWindow};
 
+use super::scene;
 use super::window::WinitUIWindow;
 use crate::dpi::PhysicalSize;
 use crate::event::{Event, InnerSizeWriter, StartCause, WindowEvent};
@@ -434,6 +435,7 @@ pub(crate) fn set_key_window(mtm: MainThreadMarker, window: &Retained<WinitUIWin
         },
     }
     drop(this);
+    scene::attach_to_scene(mtm, window);
     window.makeKeyAndVisible();
 }
 
@@ -490,6 +492,7 @@ pub fn did_finish_launching(mtm: MainThreadMarker) {
         window.setRootViewController(None);
         window.setRootViewController(controller.as_deref());
 
+        scene::attach_to_scene(mtm, &window);
         window.makeKeyAndVisible();
     }
 
@@ -502,6 +505,7 @@ pub fn did_finish_launching(mtm: MainThreadMarker) {
     // the above window dance hack, could possibly trigger new windows to be created.
     // we can just set those windows up normally, as they were created after didFinishLaunching
     for window in windows {
+        scene::attach_to_scene(mtm, &window);
         window.makeKeyAndVisible();
     }
 }
@@ -877,10 +881,6 @@ macro_rules! os_capabilities {
 }
 
 os_capabilities! {
-    /// <https://developer.apple.com/documentation/uikit/uiview/2891103-safeareainsets?language=objc>
-    #[allow(unused)] // error message unused
-    safe_area_err_msg: "-[UIView safeAreaInsets]",
-    safe_area: 11-0,
     /// <https://developer.apple.com/documentation/uikit/uiviewcontroller/2887509-setneedsupdateofhomeindicatoraut?language=objc>
     home_indicator_hidden_err_msg: "-[UIViewController setNeedsUpdateOfHomeIndicatorAutoHidden]",
     home_indicator_hidden: 11-0,

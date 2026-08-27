@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::cursor::Cursor;
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::platform_impl::Fullscreen;
 use crate::window::ImePurpose;
 use crate::{error, window};
@@ -224,6 +224,11 @@ impl Window {
         let path = self.window_socket.fpath(&mut buf).expect("failed to read properties");
         let properties = WindowProperties::new(path);
         (properties.w, properties.h).into()
+    }
+
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     #[inline]

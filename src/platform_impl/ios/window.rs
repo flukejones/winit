@@ -4,13 +4,13 @@ use std::collections::VecDeque;
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject};
-use objc2::{class, declare_class, msg_send, msg_send_id, mutability, ClassType, DeclaredClass};
+use objc2::{class, declare_class, msg_send_id, mutability, ClassType, DeclaredClass};
 use objc2_foundation::{
     CGFloat, CGPoint, CGRect, CGSize, MainThreadBound, MainThreadMarker, NSObjectProtocol,
 };
 use objc2_ui_kit::{
-    UIApplication, UICoordinateSpace, UIResponder, UIScreen, UIScreenOverscanCompensation,
-    UIViewController, UIWindow,
+    UICoordinateSpace, UIResponder, UIScreen, UIScreenOverscanCompensation, UIViewController,
+    UIWindow,
 };
 use tracing::{debug, warn};
 
@@ -18,7 +18,9 @@ use super::app_state::EventWrapper;
 use super::view::WinitView;
 use super::view_controller::WinitViewController;
 use crate::cursor::Cursor;
-use crate::dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{
+    LogicalPosition, LogicalSize, PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size,
+};
 use crate::error::{ExternalError, NotSupportedError, OsError as RootOsError};
 use crate::event::{Event, WindowEvent};
 use crate::icon::Icon;
@@ -31,6 +33,7 @@ use crate::window::{
     WindowButtons, WindowId as RootWindowId, WindowLevel,
 };
 
+// No Focused mapping: iOS 26's keyboard takes key window (see scene.rs).
 declare_class!(
     #[derive(Debug, PartialEq, Eq, Hash)]
     pub(crate) struct WinitUIWindow;
@@ -43,34 +46,6 @@ declare_class!(
     }
 
     impl DeclaredClass for WinitUIWindow {}
-
-    unsafe impl WinitUIWindow {
-        #[method(becomeKeyWindow)]
-        fn become_key_window(&self) {
-            let mtm = MainThreadMarker::new().unwrap();
-            app_state::handle_nonuser_event(
-                mtm,
-                EventWrapper::StaticEvent(Event::WindowEvent {
-                    window_id: RootWindowId(self.id()),
-                    event: WindowEvent::Focused(true),
-                }),
-            );
-            let _: () = unsafe { msg_send![super(self), becomeKeyWindow] };
-        }
-
-        #[method(resignKeyWindow)]
-        fn resign_key_window(&self) {
-            let mtm = MainThreadMarker::new().unwrap();
-            app_state::handle_nonuser_event(
-                mtm,
-                EventWrapper::StaticEvent(Event::WindowEvent {
-                    window_id: RootWindowId(self.id()),
-                    event: WindowEvent::Focused(false),
-                }),
-            );
-            let _: () = unsafe { msg_send![super(self), resignKeyWindow] };
-        }
-    }
 );
 
 impl WinitUIWindow {
@@ -156,11 +131,8 @@ impl Inner {
     pub fn pre_present_notify(&self) {}
 
     pub fn inner_position(&self) -> Result<PhysicalPosition<i32>, NotSupportedError> {
-        let safe_area = self.safe_area_screen_space();
-        let position =
-            LogicalPosition { x: safe_area.origin.x as f64, y: safe_area.origin.y as f64 };
-        let scale_factor = self.scale_factor();
-        Ok(position.to_physical(scale_factor))
+        // Not the safe area: must agree with the size `Resized` reports.
+        self.outer_position()
     }
 
     pub fn outer_position(&self) -> Result<PhysicalPosition<i32>, NotSupportedError> {
@@ -184,13 +156,19 @@ impl Inner {
     }
 
     pub fn inner_size(&self) -> PhysicalSize<u32> {
+        self.outer_size()
+    }
+
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        let insets = self.window.safeAreaInsets();
         let scale_factor = self.scale_factor();
-        let safe_area = self.safe_area_screen_space();
-        let size = LogicalSize {
-            width: safe_area.size.width as f64,
-            height: safe_area.size.height as f64,
-        };
-        size.to_physical(scale_factor)
+        let to_physical = |v: CGFloat| (v as f64 * scale_factor).round().max(0.0) as u32;
+        PhysicalInsets::new(
+            to_physical(insets.top),
+            to_physical(insets.left),
+            to_physical(insets.bottom),
+            to_physical(insets.right),
+        )
     }
 
     pub fn outer_size(&self) -> PhysicalSize<u32> {
@@ -373,6 +351,7 @@ impl Inner {
     /// <https://developer.apple.com/documentation/uikit/uiresponder/1621113-becomefirstresponder>
     pub fn set_ime_allowed(&self, allowed: bool) {
         if allowed {
+            self.view.arm_phantom_return_guard();
             unsafe {
                 self.view.becomeFirstResponder();
             }
@@ -667,43 +646,6 @@ impl Inner {
     fn rect_from_screen_space(&self, rect: CGRect) -> CGRect {
         let screen_space = self.window.screen().coordinateSpace();
         self.window.convertRect_fromCoordinateSpace(rect, &screen_space)
-    }
-
-    fn safe_area_screen_space(&self) -> CGRect {
-        let bounds = self.window.bounds();
-        if app_state::os_capabilities().safe_area {
-            let safe_area = self.window.safeAreaInsets();
-            let safe_bounds = CGRect {
-                origin: CGPoint {
-                    x: bounds.origin.x + safe_area.left,
-                    y: bounds.origin.y + safe_area.top,
-                },
-                size: CGSize {
-                    width: bounds.size.width - safe_area.left - safe_area.right,
-                    height: bounds.size.height - safe_area.top - safe_area.bottom,
-                },
-            };
-            self.rect_to_screen_space(safe_bounds)
-        } else {
-            let screen_frame = self.rect_to_screen_space(bounds);
-            let status_bar_frame = {
-                let app = UIApplication::sharedApplication(MainThreadMarker::new().unwrap());
-                #[allow(deprecated)]
-                app.statusBarFrame()
-            };
-            let (y, height) = if screen_frame.origin.y > status_bar_frame.size.height {
-                (screen_frame.origin.y, screen_frame.size.height)
-            } else {
-                let y = status_bar_frame.size.height;
-                let height = screen_frame.size.height
-                    - (status_bar_frame.size.height - screen_frame.origin.y);
-                (y, height)
-            };
-            CGRect {
-                origin: CGPoint { x: screen_frame.origin.x, y },
-                size: CGSize { width: screen_frame.size.width, height },
-            }
-        }
     }
 }
 

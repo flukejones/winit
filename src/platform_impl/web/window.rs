@@ -1,4 +1,4 @@
-use crate::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
+use crate::dpi::{PhysicalInsets, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error::{ExternalError, NotSupportedError, OsError as RootOE};
 use crate::icon::Icon;
 use crate::window::{
@@ -154,6 +154,11 @@ impl Inner {
     #[inline]
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         self.canvas.borrow().inner_size()
+    }
+
+    #[inline]
+    pub fn safe_area(&self) -> PhysicalInsets<u32> {
+        PhysicalInsets::new(0, 0, 0, 0)
     }
 
     #[inline]
